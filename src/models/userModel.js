@@ -1,4 +1,4 @@
-const db = require('../config/db'); // Adjust the path as necessary
+const db = require('../config/db'); // Ensure this is pointing to the correct file
 
 class UserModel {
   static async create({ firstName, lastName, email, phoneNumber, password }) {
@@ -13,18 +13,37 @@ class UserModel {
   }
 
   static async findByEmailOrPhone(identifier) {
-  try {
-    const query = 'SELECT * FROM users WHERE email = ? OR phone_number = ?';
+    const query = `
+      SELECT * FROM users 
+      WHERE email = ? OR phone_number = ?
+    `;
+    console.log('Identifier:', identifier);  // Log the identifier for debugging
     const [rows] = await db.execute(query, [identifier, identifier]);
-    return rows[0] || null; // Return the user object or null if not found
-  } catch (error) {
-    console.error('Error finding user by email or phone:', error);
-    throw new Error('Failed to find user');
+    console.log('User found:', rows[0]); // Log the user fetched from DB
+    return rows[0];
   }
-}
+  
+  static async findById(id) {
+    try {
+      const query = 'SELECT * FROM users WHERE id = ?';
+      const [rows] = await db.execute(query, [id]);
+      return rows[0] || null;
+    } catch (error) {
+      console.error('Error finding user by ID:', error);
+      throw error;
+    }
+  }
 
-
-  // Additional methods as needed...
+  static async updatePassword(id, newPassword) {
+    try {
+      const query = 'UPDATE users SET password = ? WHERE id = ?';
+      const [result] = await db.execute(query, [newPassword, id]);
+      return result;
+    } catch (error) {
+      console.error('Error updating password:', error);
+      throw error;
+    }
+  }
 }
 
 module.exports = UserModel;
