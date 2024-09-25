@@ -33,17 +33,24 @@ class UserModel {
       throw error;
     }
   }
-
   static async updatePassword(id, newPassword) {
     try {
-      const query = 'UPDATE users SET password = ? WHERE id = ?';
-      const [result] = await db.execute(query, [newPassword, id]);
-      return result;
+        const query = 'UPDATE users SET password = ? WHERE id = ?';
+        const [result] = await db.execute(query, [newPassword, id]);
+        
+        if (result.affectedRows === 0) {
+            console.error('Error updating password: No rows affected.');
+            throw new Error('Password update failed');
+        }
+        
+        console.log('Password updated successfully for user ID:', id);
+        return result;
     } catch (error) {
-      console.error('Error updating password:', error);
-      throw error;
+        console.error('Error updating password:', error);
+        throw error;
     }
-  }
+}
+
 }
 
 module.exports = UserModel;
