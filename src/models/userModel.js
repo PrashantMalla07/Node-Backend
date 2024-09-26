@@ -50,7 +50,23 @@ class UserModel {
         throw error;
     }
 }
-
+static async updateAdminStatus(id, isAdmin) {
+  try {
+    const query = 'UPDATE users SET is_admin = ? WHERE id = ?';
+    const [result] = await db.execute(query, [isAdmin ? 1 : 0, id]);
+    
+    if (result.affectedRows === 0) {
+      console.error('Error updating admin status: No rows affected.');
+      throw new Error('Admin status update failed');
+    }
+    
+    console.log('Admin status updated successfully for user ID:', id);
+    return result;
+  } catch (error) {
+    console.error('Error updating admin status:', error);
+    throw error;
+  }
+}
 }
 
 module.exports = UserModel;

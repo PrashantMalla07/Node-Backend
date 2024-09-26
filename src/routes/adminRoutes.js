@@ -2,7 +2,10 @@ const express = require('express');
 const router = express.Router();
 const { body, validationResult } = require('express-validator');
 const db = require('../config/db');
+const bcrypt = require('bcrypt');
 const authMiddleware = require('../middleware/authMiddleware');
+
+const saltRounds = 10; // Ensure this matches the salt rounds used during registration
 
 // Route to make a user an admin or remove admin status
 router.post('/set-admin', authMiddleware, [
@@ -30,8 +33,45 @@ router.post('/set-admin', authMiddleware, [
     res.status(500).json({ error: err.message });
   }
 });
+
+// Route to check admin status
 router.get('/check-admin', authMiddleware, (req, res) => {
-    res.status(200).json({ isAdmin: req.user.isAdmin });
-  });
+  res.status(200).json({ isAdmin: req.user.isAdmin });
+});
+
+// Route to update admin password
+router.post('/update-admin-password', authMiddleware, [
+  body('userId').isInt().withMessage('Invalid user ID'),
+  body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters long'),
+], async (req, res) => {
+  const errors = validationResult(req);
+  if (!errors.isEmpty()) {
+    return res.status(400).json({ errors: errors.array() });
+  }
+
+  const { userId, newPassword } = req.body;
+
+  try {
+    // Check if the user is an admin
+    if (!req.user.isAdmin) {
+      return res.status(403).json({ message: 'Admin rights required' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    // Update the password in the database
+    const updateQuery = 'UPDATE users SET password = ? WHERE id = ?';
+    const [result] = await db.query(updateQuery, [hashedPassword, userId]);
+
+    if (result.affectedRows === 0) {
+      throw new Error('Admin user not found or password update failed');
+    }
+
+    res.status(200).json({ message: 'Admin password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 
 module.exports = router;

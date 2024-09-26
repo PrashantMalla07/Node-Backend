@@ -84,28 +84,41 @@ app.post('/register', [
     }
 
     try {
+        console.log('Received identifier:', identifier);
+
         // Find user by email or phone number
         const user = await UserModel.findByEmailOrPhone(identifier);
-        if (!user || !(await bcrypt.compare(password, user.password))) {
+        console.log('Found user:', user);
+
+        if (!user) {
             return res.status(401).json({ message: 'Invalid email/phone number or password' });
         }
 
+        const isPasswordValid = await bcrypt.compare(password, user.password);
+        console.log('Password valid:', isPasswordValid);
+
+        if (!isPasswordValid) {
+            return res.status(401).json({ message: 'Invalid email/phone number or password' });
+        }
+
+        console.log('User isAdmin:', user.is_admin);
+
         // Generate JWT token with user id and isAdmin
         const token = jwt.sign(
-            { id: user.id, email: user.email, isAdmin: user.is_admin === 1 }, // Payload includes isAdmin
-            secretKey, // Secret key
-            { expiresIn: '1h' } // Options
+            { id: user.id, email: user.email, isAdmin: user.is_admin === 1 },
+            secretKey,
+            { expiresIn: '1h' }
         );
 
         res.status(200).json({
             message: 'Login successful',
-            token, // Include the token in the response
+            token,
             user: {
                 firstName: user.first_name,
                 lastName: user.last_name,
                 email: user.email,
                 phoneNumber: user.phone_number,
-                isAdmin: user.is_admin === 1 // Include isAdmin in the user object
+                isAdmin: user.is_admin === 1
             }
         });
     } catch (error) {
@@ -113,6 +126,7 @@ app.post('/register', [
         res.status(500).json({ message: 'Internal server error' });
     }
 });
+
 
 app.post('/change-password', authMiddleware, async (req, res) => {
     const { currentPassword, newPassword, confirmPassword } = req.body;
@@ -160,6 +174,28 @@ app.get('/users', async (req, res) => {
         return res.status(500).json({ message: 'Database error' });
     }
 });
+app.post('/update-admin-status/:id', async (req, res) => {
+    const { id } = req.params;
+    const { isAdmin } = req.body;
+  
+    if (typeof isAdmin !== 'boolean') {
+      return res.status(400).json({ message: 'Invalid isAdmin value' });
+    }
+  
+    try {
+      const result = await UserModel.updateAdminStatus(id, isAdmin);
+  
+      if (result.affectedRows === 0) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+  
+      res.status(200).json({ message: 'User admin status updated successfully' });
+    } catch (error) {
+      console.error('Error updating admin status:', error.message);
+      res.status(500).json({ message: 'Internal server error', error: error.message });
+    }
+  });
+  
 
 // Start server
 const PORT = process.env.PORT || 3000;

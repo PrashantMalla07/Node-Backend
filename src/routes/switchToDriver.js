@@ -4,7 +4,6 @@ const { body, validationResult } = require('express-validator');
 const db = require('../config/db'); // Import your database connection
 const multer = require('multer');
 
-
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -49,9 +48,14 @@ router.post(
     } = req.body;
 
     // Retrieve file paths if the images are uploaded
-    const driverPhotoPath = req.files['driverPhoto'] ? req.files['driverPhoto'][0].path : null;
-    const licensePhotoPath = req.files['licensePhoto'] ? req.files['licensePhoto'][0].path : null;
-    const citizenshipPhotoPath = req.files['citizenshipPhoto'] ? req.files['citizenshipPhoto'][0].path : null;
+    const driverPhotoPath = req.files && req.files['driverPhoto'] ? req.files['driverPhoto'][0].path : null;
+    const licensePhotoPath = req.files && req.files['licensePhoto'] ? req.files['licensePhoto'][0].path : null;
+    const citizenshipPhotoPath = req.files && req.files['citizenshipPhoto'] ? req.files['citizenshipPhoto'][0].path : null;
+
+    // Check if files are uploaded
+    if (!driverPhotoPath || !licensePhotoPath || !citizenshipPhotoPath) {
+      return res.status(400).json({ error: 'All photo uploads are required (driver, license, and citizenship).' });
+    }
 
     try {
       // Insert driver details into the database

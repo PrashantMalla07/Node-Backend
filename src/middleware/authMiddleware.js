@@ -1,39 +1,36 @@
 const jwt = require('jsonwebtoken');
-const db = require('../config/db'); // Ensure this path is correct
+const db = require('../config/db');
 
 const authMiddleware = async (req, res, next) => {
-    // Extract token from Authorization header
     const authHeader = req.headers['authorization'];
     if (!authHeader) {
         return res.status(401).json({ error: 'No token provided' });
     }
 
-    // Format of token should be "Bearer token"
     const token = authHeader.split(' ')[1];
     if (!token) {
-        return res.status(401).json({ error: 'No token provided' });
+        return res.status(401).json({ error: 'Token is malformed' });
     }
 
     try {
-        // Verify the JWT token
         const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-        // Fetch user from the database to check admin status
         const [rows] = await db.query('SELECT is_admin FROM users WHERE id = ?', [decoded.id]);
 
         if (rows.length === 0) {
             return res.status(401).json({ error: 'User not found' });
         }
 
-        // Add user details to the request object
         req.user = {
             id: decoded.id,
-            isAdmin: rows[0].is_admin // Ensure column name matches
+            isAdmin: rows[0].is_admin
         };
 
-        // Proceed to the next middleware or route handler
         next();
     } catch (err) {
+        if (err.name === 'TokenExpiredError') {
+            return res.status(401).json({ error: 'Token has expired', details: err.message });
+        }
         console.error('Token verification failed:', err.message);
         return res.status(401).json({ error: 'Invalid token', details: err.message });
     }
