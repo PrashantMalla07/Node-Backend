@@ -1,6 +1,6 @@
 // middleware/sessionMiddleware.js
 
-const session = require('express-session');
+import session from 'express-session';
 
 const sessionMiddleware = session({
   secret: 'your-secret-key',
@@ -9,4 +9,4 @@ const sessionMiddleware = session({
   cookie: { secure: false } // Set to true if using HTTPS
 });
 
-module.exports = sessionMiddleware;
+export default sessionMiddleware;

@@ -1,14 +1,15 @@
-const express = require('express');
-const router = express.Router();
-const { body, validationResult } = require('express-validator');
-const db = require('../config/db');
-const bcrypt = require('bcrypt');
-const authMiddleware = require('../middleware/authMiddleware');
+import bcrypt from 'bcrypt';
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import db from '../config/db.mjs';
+import authMiddleware from '../middleware/authMiddleware.js';
 
 const saltRounds = 10; // Ensure this matches the salt rounds used during registration
 
+const adminRouter = express.Router();
+
 // Route to make a user an admin or remove admin status
-router.post('/set-admin', authMiddleware, [
+adminRouter.post('/set-admin', authMiddleware, [
   body('userId').isInt().withMessage('Invalid user ID'),
   body('isAdmin').isBoolean().withMessage('Admin status must be a boolean'),
 ], async (req, res) => {
@@ -35,12 +36,12 @@ router.post('/set-admin', authMiddleware, [
 });
 
 // Route to check admin status
-router.get('/check-admin', authMiddleware, (req, res) => {
+adminRouter.get('/check-admin', authMiddleware, (req, res) => {
   res.status(200).json({ isAdmin: req.user.isAdmin });
 });
 
 // Route to update admin password
-router.post('/update-admin-password', authMiddleware, [
+adminRouter.post('/update-admin-password', authMiddleware, [
   body('userId').isInt().withMessage('Invalid user ID'),
   body('newPassword').isLength({ min: 6 }).withMessage('New password must be at least 6 characters long'),
 ], async (req, res) => {
@@ -74,4 +75,4 @@ router.post('/update-admin-password', authMiddleware, [
   }
 });
 
-module.exports = router;
+export default adminRouter;

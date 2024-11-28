@@ -1,5 +1,5 @@
-const { compare, hash } = require('bcrypt');
-const UserModel = require('../models/userModel');
+import { compare, hash } from 'bcrypt';
+import UserModel from '../models/userModel.js';
 
 class UserController {
   static async register(req, res) {
@@ -64,4 +64,4 @@ class UserController {
   }
 }
 
-module.exports = UserController;
+export default UserController;

@@ -1,5 +1,5 @@
-const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+import jwt from 'jsonwebtoken';
+import db from '../config/db.mjs';
 
 const authMiddleware = async (req, res, next) => {
     const authHeader = req.headers['authorization'];
@@ -17,6 +17,9 @@ const authMiddleware = async (req, res, next) => {
 
         const [rows] = await db.query('SELECT is_admin FROM users WHERE id = ?', [decoded.id]);
 
+        // Log the user details to verify the response
+        console.log('User info:', rows);
+
         if (rows.length === 0) {
             return res.status(401).json({ error: 'User not found' });
         }
@@ -25,6 +28,9 @@ const authMiddleware = async (req, res, next) => {
             id: decoded.id,
             isAdmin: rows[0].is_admin
         };
+
+        // Log the user object to verify isAdmin status
+        console.log('req.user:', req.user);
 
         next();
     } catch (err) {
@@ -36,4 +42,4 @@ const authMiddleware = async (req, res, next) => {
     }
 };
 
-module.exports = authMiddleware;
+export default authMiddleware;

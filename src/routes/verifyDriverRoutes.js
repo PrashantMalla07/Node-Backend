@@ -1,12 +1,13 @@
 // verifydriver.js
-const express = require('express');
-const router = express.Router();
-const { body, validationResult } = require('express-validator');
-const db = require('../config/db');
-const authMiddleware = require('../middleware/authMiddleware');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import db from '../config/db.mjs';
+import authMiddleware from '../middleware/authMiddleware.js';
+
+const verifyDriverRouter = express.Router();
 
 // Admin verification of a driver
-router.post('/verify-driver', authMiddleware, [
+verifyDriverRouter.post('/verify-driver', authMiddleware, [
   body('userId').isInt(),
   body('isVerified').isBoolean(),
 ], async (req, res) => {
@@ -39,4 +40,4 @@ router.post('/verify-driver', authMiddleware, [
   }
 });
 
-module.exports = router;
+export default verifyDriverRouter;

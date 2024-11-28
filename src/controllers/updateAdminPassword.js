@@ -1,6 +1,5 @@
-const mysql = require('mysql2/promise'); // Adjust based on your database package
-const bcrypt = require('bcrypt');
-require('dotenv').config(); // Ensure environment variables are loaded
+import bcrypt from 'bcrypt';
+import mysql from 'mysql2/promise';
 
 const saltRounds = 10; // Ensure this matches the salt rounds used during registration
 

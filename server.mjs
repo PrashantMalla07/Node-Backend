@@ -1,23 +1,21 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const path = require('path');
-const userRoutes = require('./src/routes/userRoutes');
-require('dotenv').config();
-const UserModel = require('./src/models/userModel');
-const session = require('express-session');
-const authMiddleware = require('./src/middleware/authMiddleware');
-const bcrypt = require('bcrypt');
-const db = require('./src/config/db'); // Use the correct path to your config file
-const switchToDriverRoutes = require('./src/routes/switchToDriver');
-const verifyDriverRoutes = require('./src/routes/verifyDriverRoutes');
-const adminRoutes = require('./src/routes/adminRoutes');
-const { body, validationResult } = require('express-validator');
-const authRoutes = require('./src/routes/authRoutes');
-const adminDashboardRoutes = require('./src/routes/adminDashboardRoutes'); 
+import bcrypt from 'bcrypt';
+import bodyParser from 'body-parser';
+import cors from 'cors';
+import express from 'express';
+import session from 'express-session';
+import { body, validationResult } from 'express-validator';
+import jwt from "jsonwebtoken";
+import db from './src/config/db.mjs'; // Use the correct path to your config file
+import authMiddleware from './src/middleware/authMiddleware.js';
+import UserModel from './src/models/userModel.js';
+import adminDashboardRoutes from './src/routes/adminDashboardRoutes.js';
+import adminRoutes from './src/routes/adminRoutes.js';
+import authRoutes from './src/routes/authRoutes.js';
+import switchToDriverRoutes from './src/routes/switchToDriver.js';
+import verifyDriverRoutes from './src/routes/verifyDriverRoutes.js';
 // Initialize app
 const app = express();
-const jwt = require('jsonwebtoken');
+
 const secretKey = process.env.JWT_SECRET || 'your-secret-key';
 // Use CORS
 app.use(cors());
@@ -32,7 +30,8 @@ app.use(session({
 }));
 
 // Serve static files from the "public" directory
-app.use(express.static(path.join(__dirname, 'public')));
+// app.use(express.static(path.join(__dirname, 'public')));
+
 
 app.post('/register', [
     body('first_name').notEmpty().withMessage('First name is required'),
@@ -40,74 +39,97 @@ app.post('/register', [
     body('email').isEmail().withMessage('Invalid email format'),
     body('phone_number').isLength({ min: 10 }).withMessage('Phone number must be at least 10 digits'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long')
-  ], async (req, res) => {
+], async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+        return res.status(400).json({ errors: errors.array() });
     }
-  
+
     const { first_name, last_name, email, phone_number, password } = req.body;
-  
+
     try {
-      // Check if the phone number already exists
-      const checkPhoneQuery = 'SELECT * FROM users WHERE phone_number = ?';
-      const [phoneResults] = await db.execute(checkPhoneQuery, [phone_number]);
-  
-      if (phoneResults.length > 0) {
-        return res.status(400).json({ message: 'Phone number already in use' });
-      }
-  
-      // Check if the email already exists
-      const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
-      const [emailResults] = await db.execute(checkEmailQuery, [email]);
-  
-      if (emailResults.length > 0) {
-        return res.status(400).json({ message: 'Email already in use' });
-      }
-  
-      // If phone number and email are not in use, proceed to insert the user
-      const hashedPassword = await bcrypt.hash(password, 10);
-      const insertQuery = 'INSERT INTO users (first_name, last_name, email, phone_number, password) VALUES (?, ?, ?, ?, ?)';
-      const [insertResults] = await db.execute(insertQuery, [first_name, last_name, email, phone_number, hashedPassword]);
-  
-      return res.status(201).json({ message: 'User registered successfully', userId: insertResults.insertId });
+        // Check if the phone number already exists
+        const checkPhoneQuery = 'SELECT * FROM users WHERE phone_number = ?';
+        const [phoneResults] = await db.execute(checkPhoneQuery, [phone_number]);
+
+        if (phoneResults.length > 0) {
+            return res.status(400).json({ message: 'Phone number already in use' });
+        }
+
+        // Check if the email already exists
+        const checkEmailQuery = 'SELECT * FROM users WHERE email = ?';
+        const [emailResults] = await db.execute(checkEmailQuery, [email]);
+
+        if (emailResults.length > 0) {
+            return res.status(400).json({ message: 'Email already in use' });
+        }
+
+        // If phone number and email are not in use, proceed to insert the user
+        const hashedPassword = await bcrypt.hash(password, 10);
+        const insertQuery = 'INSERT INTO users (first_name, last_name, email, phone_number, password) VALUES (?, ?, ?, ?, ?)';
+        const [insertResults] = await db.execute(insertQuery, [first_name, last_name, email, phone_number, hashedPassword]);
+
+        return res.status(201).json({ message: 'User registered successfully', userId: insertResults.insertId });
     } catch (err) {
-      console.error('Error inserting user into MySQL:', err.message);
-      return res.status(500).json({ message: 'Database error' });
+        console.error('Error inserting user into MySQL:', err.message);
+        return res.status(500).json({ message: 'Database error' });
     }
-  });
-  app.post('/login', async (req, res) => {
+});
+
+// **User Status Endpoint**
+app.post('/api/user-status', authMiddleware, async (req, res) => {
+    const userId = req.user.id; // The user ID from the authenticated request
+
+    try {
+        // Fetch user details by user ID
+        const [userDetails] = await db.execute('SELECT id, is_driver, driver_status, verification_data_filled FROM users WHERE id = ?', [userId]);
+
+        if (userDetails.length === 0) {
+            return res.status(404).json({ message: 'User not found.' });
+        }
+
+        // Respond with user status
+        res.status(200).json({
+            isDriver: userDetails[0].is_driver,
+            driverStatus: userDetails[0].driver_status,
+            verificationDataFilled: userDetails[0].verification_data_filled,
+        });
+    } catch (err) {
+        console.error('Error fetching user status:', err);
+        res.status(500).json({ message: 'Internal server error' });
+    }
+});
+
+// **Login Route**
+app.post('/login', async (req, res) => {
     const { identifier, password } = req.body;
 
+    // Check for missing identifier or password
     if (!identifier || !password) {
         return res.status(400).json({ message: 'Identifier and password are required' });
     }
 
     try {
-        console.log('Received identifier:', identifier);
-
         // Find user by email or phone number
         const user = await UserModel.findByEmailOrPhone(identifier);
-        console.log('Found user:', user);
 
+        // Check if user exists
         if (!user) {
             return res.status(401).json({ message: 'Invalid email/phone number or password' });
         }
 
+        // Validate password
         const isPasswordValid = await bcrypt.compare(password, user.password);
-        console.log('Password valid:', isPasswordValid);
 
         if (!isPasswordValid) {
             return res.status(401).json({ message: 'Invalid email/phone number or password' });
         }
 
-        console.log('User isAdmin:', user.is_admin);
-
-        // Generate JWT token with user id and isAdmin
+        // Generate JWT token
         const token = jwt.sign(
             { id: user.id, email: user.email, isAdmin: user.is_admin === 1 },
             secretKey,
-            { expiresIn: '1h' }
+            { expiresIn: '1y' }
         );
 
         res.status(200).json({
@@ -127,42 +149,10 @@ app.post('/register', [
     }
 });
 
-
-app.post('/change-password', authMiddleware, async (req, res) => {
-    const { currentPassword, newPassword, confirmPassword } = req.body;
-
-    try {
-        const userId = req.user.id;
-        const user = await UserModel.findById(userId);
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found' });
-        }
-
-        const isMatch = await bcrypt.compare(currentPassword, user.password);
-
-        if (!isMatch) {
-            return res.status(400).json({ error: 'Current password is incorrect' });
-        }
-
-        if (newPassword !== confirmPassword) {
-            return res.status(400).json({ error: 'Passwords do not match' });
-        }
-
-        const hashedNewPassword = await bcrypt.hash(newPassword, 10);
-        await UserModel.updatePassword(userId, hashedNewPassword);
-
-        res.status(200).json({ message: 'Password updated successfully' });
-    } catch (error) {
-        console.error('Error changing password:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
 app.use('/api', switchToDriverRoutes); // Mount the router with '/api' or any other prefix you prefer
 app.use('/api/admin', verifyDriverRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
-
 app.use('/api/admin-dashboard', adminDashboardRoutes);
 app.get('/users', async (req, res) => {
     try {
@@ -196,7 +186,6 @@ app.post('/update-admin-status/:id', async (req, res) => {
     }
   });
   
-
 // Start server
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {

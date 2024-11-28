@@ -1,11 +1,15 @@
 // pendingdrivers.js
-const express = require('express');
-const router = express.Router();
-const authMiddleware = require('../middleware/authMiddleware');
-const db = require('../config/db');
+import express from 'express';
+import db from '../config/db.mjs';
+import authMiddleware from '../middleware/authMiddleware.js';
+
+const adminDashboardRouter = express.Router();
+
+// Export the router for use in other modules
+
 
 // Route to get pending driver applications
-router.get('/pending-drivers', authMiddleware, async (req, res) => {
+adminDashboardRouter.get('/pending-drivers', authMiddleware, async (req, res) => {
   try {
     // Check if the user is an admin
     if (!req.user.isAdmin) {
@@ -21,4 +25,4 @@ router.get('/pending-drivers', authMiddleware, async (req, res) => {
   }
 });
 
-module.exports = router;
+export default adminDashboardRouter;

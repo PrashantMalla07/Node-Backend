@@ -1,23 +1,26 @@
-const express = require('express');
-const router = express.Router();
-const { body, validationResult } = require('express-validator');
-const db = require('../config/db'); // Import your database connection
-const multer = require('multer');
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import fs from 'fs';
+import multer from 'multer';
+import db from '../config/db.mjs';
+
+const switchDriverRouter = express.Router();
+
+// Ensure upload directory exists
+const uploadPath = './uploads/';
+if (!fs.existsSync(uploadPath)) {
+  fs.mkdirSync(uploadPath, { recursive: true });
+}
 
 // Multer configuration for file uploads
 const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, './uploads/'); // You can change the path as needed
-  },
-  filename: function (req, file, cb) {
-    cb(null, Date.now() + '-' + file.originalname);
-  }
+  destination: (req, file, cb) => cb(null, uploadPath),
+  filename: (req, file, cb) => cb(null, Date.now() + '-' + file.originalname.replace(/\s+/g, '_'))
 });
-
 const upload = multer({ storage: storage });
 
-// Switch user to driver mode and create driver details
-router.post(
+// Switch to Driver Endpoint
+switchDriverRouter.post(
   '/switch-to-driver',
   upload.fields([
     { name: 'driverPhoto', maxCount: 1 },
@@ -25,12 +28,12 @@ router.post(
     { name: 'citizenshipPhoto', maxCount: 1 }
   ]),
   [
-    body('userId').isInt(),
-    body('licenseNumber').isLength({ min: 5 }),
-    body('citizenshipId').isLength({ min: 5 }),
-    body('vehicleType').isLength({ min: 2 }),
-    body('vehicleColor').isLength({ min: 2 }),
-    body('vehicleNumber').isLength({ min: 5 })
+    body('userId').isInt().withMessage('User ID must be an integer'),
+    body('licenseNumber').isLength({ min: 5 }).withMessage('License number must be at least 5 characters'),
+    body('citizenshipId').isLength({ min: 5 }).withMessage('Citizenship ID must be at least 5 characters'),
+    body('vehicleType').isLength({ min: 2 }).withMessage('Vehicle type must be at least 2 characters'),
+    body('vehicleColor').isLength({ min: 2 }).withMessage('Vehicle color must be at least 2 characters'),
+    body('vehicleNumber').isLength({ min: 5 }).withMessage('Vehicle number must be at least 5 characters')
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -38,29 +41,34 @@ router.post(
       return res.status(400).json({ errors: errors.array() });
     }
 
-    const {
-      userId,
-      licenseNumber,
-      citizenshipId,
-      vehicleType,
-      vehicleColor,
-      vehicleNumber
-    } = req.body;
+    const { userId, licenseNumber, citizenshipId, vehicleType, vehicleColor, vehicleNumber } = req.body;
 
-    // Retrieve file paths if the images are uploaded
-    const driverPhotoPath = req.files && req.files['driverPhoto'] ? req.files['driverPhoto'][0].path : null;
-    const licensePhotoPath = req.files && req.files['licensePhoto'] ? req.files['licensePhoto'][0].path : null;
-    const citizenshipPhotoPath = req.files && req.files['citizenshipPhoto'] ? req.files['citizenshipPhoto'][0].path : null;
+    // Retrieve uploaded file paths
+    const driverPhotoPath = req.files?.driverPhoto?.[0]?.path || null;
+    const licensePhotoPath = req.files?.licensePhoto?.[0]?.path || null;
+    const citizenshipPhotoPath = req.files?.citizenshipPhoto?.[0]?.path || null;
 
-    // Check if files are uploaded
+    // Validate file uploads
     if (!driverPhotoPath || !licensePhotoPath || !citizenshipPhotoPath) {
-      return res.status(400).json({ error: 'All photo uploads are required (driver, license, and citizenship).' });
+      return res.status(400).json({
+        error: 'All photo uploads are required: driverPhoto, licensePhoto, and citizenshipPhoto.'
+      });
     }
 
     try {
-      // Insert driver details into the database
+      // Check if user exists
+      const [user] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
+      if (!user.length) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      // Insert driver details
       await db.query(
-        'INSERT INTO drivers (user_id, license_number, citizenship_id, driver_photo, license_photo, citizenship_photo, vehicle_type, vehicle_color, vehicle_number, is_verified) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)',
+        `INSERT INTO drivers (
+          user_id, license_number, citizenship_id, driver_photo,
+          license_photo, citizenship_photo, vehicle_type,
+          vehicle_color, vehicle_number, is_verified
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
         [
           userId,
           licenseNumber,
@@ -74,11 +82,11 @@ router.post(
         ]
       );
 
-      res.status(200).json({ message: 'Driver application submitted. Awaiting admin verification.' });
+      res.status(200).json({ message: 'Driver application submitted successfully. Awaiting admin verification.' });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   }
 );
 
-module.exports = router;
+export default switchDriverRouter;

@@ -1,12 +1,13 @@
-const express = require('express');
-const router = express.Router();
-const jwt = require('jsonwebtoken');
-const db = require('../config/db');
+import express from 'express';
+import jwt from 'jsonwebtoken';
+import db from '../config/db.mjs';
+
+const authRouter = express.Router();
 
 const secretKey = process.env.JWT_SECRET || 'your-secret-key';
 
 // Refresh token route
-router.post('/refresh-token', async (req, res) => {
+authRouter.post('/refresh-token', async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
@@ -26,7 +27,7 @@ router.post('/refresh-token', async (req, res) => {
     const newToken = jwt.sign(
       { id: rows[0].id, email: rows[0].email },
       secretKey,
-      { expiresIn: '1h' }
+      { expiresIn: '1y' }
     );
 
     res.status(200).json({ token: newToken });
@@ -35,4 +36,4 @@ router.post('/refresh-token', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default authRouter;

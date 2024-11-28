@@ -1,13 +1,14 @@
-const express = require('express');
-const router = express.Router();
-const jwt = require('jsonwebtoken');
-const { body, validationResult } = require('express-validator');
-const db = require('../config/db'); // Ensure you have a correct reference for your database
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import jwt from 'jsonwebtoken';
+import db from '../config/db.mjs';
+
+const refreshTokenRouter = express.Router(); // Ensure you have a correct reference for your database
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
-router.post('/refresh-token', [
+refreshTokenRouter.post('/refresh-token', [
   body('refreshToken').isString().withMessage('Refresh token is required'),
 ], async (req, res) => {
   const errors = validationResult(req);
@@ -23,10 +24,10 @@ router.post('/refresh-token', [
     const userId = decoded.id; // Extract user ID from the decoded token
 
     // Optionally check if the user exists in the database (if necessary)
-    // const [rows] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
-    // if (rows.length === 0) {
-    //     return res.status(401).json({ error: 'User not found' });
-    // }
+    const [rows] = await db.query('SELECT id FROM users WHERE id = ?', [userId]);
+    if (rows.length === 0) {
+        return res.status(401).json({ error: 'User not found' });
+    }
 
     // Issue a new JWT token
     const newToken = jwt.sign({ id: userId }, JWT_SECRET, { expiresIn: '1h' }); // Set your token expiration time
@@ -42,4 +43,4 @@ router.post('/refresh-token', [
   }
 });
 
-module.exports = router;
+export default refreshTokenRouter;

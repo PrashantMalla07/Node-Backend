@@ -1,6 +1,7 @@
-const mysql = require('mysql2');
-require('dotenv').config();
+import dotenv from 'dotenv';
+import mysql from 'mysql2';
 
+dotenv.config();
 // Create a connection pool
 const pool = mysql.createPool({
   host: process.env.DB_HOST, // Ensure these match your .env file
@@ -12,4 +13,4 @@ const pool = mysql.createPool({
 });
 
 // Export the pool with promise-based API for async/await
-module.exports = pool.promise();
+export default pool.promise();

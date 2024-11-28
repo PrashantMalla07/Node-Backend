@@ -1,4 +1,4 @@
-const db = require('../config/db'); // Ensure this is pointing to the correct file
+import db from '../config/db.mjs';
 
 class UserModel {
   static async create({ firstName, lastName, email, phoneNumber, password }) {
@@ -69,4 +69,4 @@ static async updateAdminStatus(id, isAdmin) {
 }
 }
 
-module.exports = UserModel;
+export default UserModel;
