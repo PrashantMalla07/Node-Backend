@@ -6,12 +6,18 @@ import session from 'express-session';
 import { body, validationResult } from 'express-validator';
 import jwt from "jsonwebtoken";
 import db from './src/config/db.mjs'; // Use the correct path to your config file
-import authMiddleware from './src/middleware/authMiddleware.js';
 import UserModel from './src/models/userModel.js';
 import adminDashboardRoutes from './src/routes/adminDashboardRoutes.js';
 import adminRoutes from './src/routes/adminRoutes.js';
 import authRoutes from './src/routes/authRoutes.js';
-import switchToDriverRoutes from './src/routes/switchToDriver.js';
+import driverDetailRouter from './src/routes/driverDetailRoutes.js';
+import driverLoginRouter from './src/routes/driverLogin.js';
+import driverRegisterRouter from './src/routes/driverRegistration.js';
+import notificationsRouter from './src/routes/notifications.js';
+import paymentsRouter from './src/routes/payments.js';
+import reviewsRouter from './src/routes/reviews.js';
+import rideRequestsRouter from './src/routes/rideRequests.js';
+import ridesRouter from './src/routes/rides.js';
 import verifyDriverRoutes from './src/routes/verifyDriverRoutes.js';
 // Initialize app
 const app = express();
@@ -77,29 +83,33 @@ app.post('/register', [
 });
 
 // **User Status Endpoint**
-app.post('/api/user-status', authMiddleware, async (req, res) => {
-    const userId = req.user.id; // The user ID from the authenticated request
-
-    try {
-        // Fetch user details by user ID
-        const [userDetails] = await db.execute('SELECT id, is_driver, driver_status, verification_data_filled FROM users WHERE id = ?', [userId]);
-
-        if (userDetails.length === 0) {
-            return res.status(404).json({ message: 'User not found.' });
-        }
-
-        // Respond with user status
-        res.status(200).json({
-            isDriver: userDetails[0].is_driver,
-            driverStatus: userDetails[0].driver_status,
-            verificationDataFilled: userDetails[0].verification_data_filled,
-        });
-    } catch (err) {
-        console.error('Error fetching user status:', err);
-        res.status(500).json({ message: 'Internal server error' });
+app.post('/api/user-status', async (req, res) => {
+    const userId = 6; // The user ID from the authenticated request or headers
+  
+    if (!userId) {
+      return res.status(400).json({ message: 'User ID is required.' });
     }
-});
-
+  
+    try {
+      // Fetch user details by user ID
+      const [userDetails] = await db.execute('SELECT id, is_driver, driver_status, verification_data_filled FROM users WHERE id = ?', [userId]);
+  
+      if (userDetails.length === 0) {
+        return res.status(404).json({ message: 'User not found.' });
+      }
+  
+      // Respond with user status
+      res.status(200).json({
+        isDriver: userDetails[0].is_driver,
+        driverStatus: userDetails[0].driver_status,
+        verificationDataFilled: userDetails[0].verification_data_filled,
+      });
+    } catch (err) {
+      console.error('Error fetching user status:', err);
+      res.status(500).json({ message: 'Internal server error' });
+    }
+  });
+  
 // **Login Route**
 app.post('/login', async (req, res) => {
     const { identifier, password } = req.body;
@@ -149,11 +159,19 @@ app.post('/login', async (req, res) => {
     }
 });
 
-app.use('/api', switchToDriverRoutes); // Mount the router with '/api' or any other prefix you prefer
+app.use('/api', driverRegisterRouter);  
+app.use('/api', driverLoginRouter); 
 app.use('/api/admin', verifyDriverRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/admin-dashboard', adminDashboardRoutes);
+app.use('/api/rides', ridesRouter);
+app.use('/api/ride-requests', rideRequestsRouter);
+app.use('/api/reviews', reviewsRouter);
+app.use('/api/payments', paymentsRouter);
+app.use('/api/notifications', notificationsRouter);
+app.use('/api/drivers', driverDetailRouter);
+
 app.get('/users', async (req, res) => {
     try {
         const query = 'SELECT * FROM users';
@@ -163,6 +181,16 @@ app.get('/users', async (req, res) => {
         console.error('Error fetching users from MySQL:', err);
         return res.status(500).json({ message: 'Database error' });
     }
+});
+app.get('/drivers', async (req, res) => {
+  try {
+      const query = 'SELECT * FROM drivers';
+      const [result] = await db.execute(query);
+      return res.status(200).json(result);
+  } catch (err) {
+      console.error('Error fetching users from MySQL:', err);
+      return res.status(500).json({ message: 'Database error' });
+  }
 });
 app.post('/update-admin-status/:id', async (req, res) => {
     const { id } = req.params;

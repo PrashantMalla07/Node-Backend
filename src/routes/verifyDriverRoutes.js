@@ -17,6 +17,7 @@ verifyDriverRouter.post('/verify-driver', authMiddleware, [
   }
 
   const { userId, isVerified } = req.body;
+  const verificationStatus = isVerified ? 1 : 0; // Convert boolean to 1 (verified) or 0 (unverified)
 
   try {
     // Check if the user has admin rights
@@ -25,13 +26,13 @@ verifyDriverRouter.post('/verify-driver', authMiddleware, [
     }
 
     // Check if the driver exists
-    const [driver] = await db.query('SELECT * FROM drivers WHERE user_id = ?', [userId]);
+    const [driver] = await db.query('SELECT * FROM drivers WHERE id = ?', [userId]);
     if (driver.length === 0) {
       return res.status(404).json({ message: 'Driver not found' });
     }
 
     // Update the driver's verification status
-    await db.query('UPDATE drivers SET is_verified = ? WHERE user_id = ?', [isVerified, userId]);
+    await db.query('UPDATE drivers SET is_verified = ? WHERE id = ?', [verificationStatus, userId]);
     const message = isVerified ? 'Driver has been verified successfully.' : 'Driver verification has been rejected.';
     res.status(200).json({ message });
   } catch (err) {
