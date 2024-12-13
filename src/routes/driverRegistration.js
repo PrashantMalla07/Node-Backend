@@ -8,7 +8,7 @@ const driverRouter = express.Router();
 // Configure Multer for file uploads
 const upload = multer({
     dest: 'uploads/', // Files will be saved in the 'uploads' folder
-    limits: { fileSize: 20 * 1024 * 1024 } // Limit file size to 5MB
+    limits: { fileSize: 20 * 1024 * 1024 } // Limit file size to 20MB
 });
 
 // Driver Registration Endpoint
@@ -31,6 +31,7 @@ driverRouter.post('/driver-register', upload.fields([
 
         // Hash password
         const hashedPassword = await bcrypt.hash(password, 10);
+        const uid = Math.floor(1000 + Math.random() * 9000);  // Generate a UUID for the driver
 
         // Get file paths
         const driverPhotoPath = req.files?.driverPhoto?.[0]?.path || '';
@@ -40,13 +41,13 @@ driverRouter.post('/driver-register', upload.fields([
         // Insert driver data
         await db.execute(
             `INSERT INTO drivers (
-                first_name, last_name, email, phone_number, password,
+                uid, first_name, last_name, email, phone_number, password,
                 license_number, citizenship_id, driver_photo,
                 license_photo, citizenship_photo, vehicle_type,
                 vehicle_color, vehicle_number, is_verified
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)`,
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,?, 0)`,
             [
-                firstName, lastName, email, phoneNumber, hashedPassword,
+                uid, firstName, lastName, email, phoneNumber, hashedPassword,
                 licenseNumber, citizenshipId, driverPhotoPath,
                 licensePhotoPath, citizenshipPhotoPath, vehicleType,
                 vehicleColor, vehicleNumber

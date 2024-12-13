@@ -12,5 +12,6 @@ const pool = mysql.createPool({
   connectionLimit: 10 // Adjust this based on your needs
 });
 
+
 // Export the pool with promise-based API for async/await
 export default pool.promise();

@@ -1,6 +1,5 @@
 import { compare, hash } from 'bcrypt';
 import UserModel from '../models/userModel.js';
-
 class DriverController {
   static async register(req, res) {
     const { first_name, last_name, email, phone_number, password } = req.body;
@@ -12,14 +11,16 @@ class DriverController {
     try {
       // Hash the password before saving it to the database
       const hashedPassword = await hash(password, 10);
-      
+      const uid = Math.floor(1000 + Math.random() * 9000);
       // Create the user with the hashed password
       const userId = await UserModel.create({
+        uid,
         firstName: first_name,
         lastName: last_name,
         email,
         phoneNumber: phone_number,
-        password: hashedPassword
+        password: hashedPassword,
+        
       });
 
       return res.status(201).json({ message: 'User registered successfully', userId });
@@ -50,12 +51,16 @@ class DriverController {
       // Generate JWT token if required
       // const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
       // return res.status(200).json({ message: 'Login successful', token });
-
-      return res.status(200).json({
+      res.status(200).json({
         message: 'Login successful',
-        userId: user.id,
-        email: user.email,
-        phoneNumber: user.phone_number
+        driver: {
+          id: user.id,
+          uid:user.uid,
+          firstName: user.first_name,
+          lastName: user.last_name,
+          email: user.email,
+          phoneNumber: user.phone_number,
+        },
       });
     } catch (error) {
       console.error('Error during login:', error);

@@ -48,6 +48,7 @@ driverLoginRouter.post('/driver-login', async (req, res) => {
             message: 'Login successful',
             token,
             driver: {
+                uid:user.uid,
                 firstName: user.first_name,
                 lastName: user.last_name,
                 email: user.email,
