@@ -7,7 +7,7 @@ const driverRouter = express.Router();
 
 // Configure Multer for file uploads
 const upload = multer({
-    dest: 'uploads/', // Files will be saved in the 'uploads' folder
+    dest: 'uploads/uploads', // Files will be saved in the 'uploads' folder
     limits: { fileSize: 20 * 1024 * 1024 } // Limit file size to 20MB
 });
 

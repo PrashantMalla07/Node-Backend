@@ -482,25 +482,25 @@ app.post('/api/ride-requests/accept/:id', async (req, res) => {
   }
 });
 // In your Node.js/Express backend
-app.get('/api/rides/driver/:driverUid', async (req, res) => {
+app.get('/api/rides/user/:userId', async (req, res) => {
   try {
-    // Extract the driverUid from the URL parameter (now with 'driver' prefix)
-    const driverUid = req.params.driverUid.trim(); // Get the driverUid from the URL
-    console.log('Received Driver UID from URL:', driverUid);  // Log the driverUid
+    // Extract the userId from the URL parameter
+    const userId = req.params.userId.trim(); // Get the userId from the URL
+    console.log('Received User ID from URL:', userId);  // Log the userId
 
-    // SQL query to fetch rides based on the driver_uid
-    const sql = 'SELECT * FROM rides WHERE driver_uid = ?';
-    console.log('Executing SQL Query:', sql, 'with value:', driverUid);  // Log the SQL query
+    // SQL query to fetch rides based on the user_id
+    const sql = 'SELECT * FROM rides WHERE user_id = ?';
+    console.log('Executing SQL Query:', sql, 'with value:', userId);  // Log the SQL query
 
-    // Execute the query using the provided driverUid
-    const [rides] = await db.query(sql, [driverUid]);
+    // Execute the query using the provided userId
+    const [rides] = await db.query(sql, [userId]);
 
     // Log the query result to see what is returned
     console.log('Query Result:', rides);
 
     // If no rides are found, return a 404 error
     if (rides.length === 0) {
-      console.log('No rides found for Driver UID:', driverUid);
+      console.log('No rides found for User ID:', userId);
       return res.status(404).json({ error: 'Ride not found' });
     }
 
@@ -512,6 +512,7 @@ app.get('/api/rides/driver/:driverUid', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch ride history' });
   }
 });
+
 
 app.get('/test', async (req, res) => {
   try {
@@ -535,12 +536,260 @@ app.get('/test', async (req, res) => {
   }
 });
 
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Endpoint to fetch driver profile
+app.get('/driver/profile/:driverUid', async (req, res) => {
+  const driverUid = req.params.driverUid; // Match the parameter name
+  try {
+    const [driver] = await db.query('SELECT * FROM drivers WHERE uid = ?', [driverUid]);
+    if (driver.length > 0) {
+      // Modify the driver object to include the full photo URL
+      const driverData = driver[0];
+      driverData.driver_photo = `http://localhost:3000/uploads/${driverData.driver_photo}`;
+      driverData.license_photo = `http://localhost:3000/uploads/${driverData.license_photo}`;
+      driverData.citizenship_photo = `http://localhost:3000/uploads/${driverData.citizenship_photo}`;
+      res.status(200).json(driverData);
+    } else {
+      res.status(404).json({ message: 'Driver not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching driver profile:', error);
+    res.status(500).json({ message: 'Error fetching driver profile', error });
+  }
+});
+
+app.post('/upload', upload.single('photo'), (req, res) => {
+  if (req.file) {
+    res.status(200).json({ message: 'Photo uploaded successfully!' });
+  } else {
+    res.status(400).json({ message: 'No file uploaded!' });
+  }
+});
+app.post('/driver/photo/:driverUid', upload.single('driver_photo'), async (req, res) => {
+  const driverUid = req.params.driverUid;
+  const driverPhoto = req.file.filename;
+
+  try {
+    const result = await db.query('SELECT * FROM drivers WHERE uid = ?', [driverUid]);
+    if (result.length === 0) {
+      console.log(`Driver UID ${driverUid} not found.`);
+      return res.status(404).json({ message: 'Driver not found.' });
+    }
+
+    const photoUrl = `http://localhost:3000/uploads/${driverPhoto}`;
+    const updateResult = await db.query('UPDATE drivers SET driver_photo = ? WHERE uid = ?', [photoUrl, driverUid]);
+
+    if (updateResult.affectedRows > 0) {
+      res.status(200).json({ message: 'Driver photo updated successfully.' });
+    } else {
+      res.status(500).json({ message: 'Error updating driver photo.' });
+    }
+  } catch (error) {
+    console.error('Error updating driver photo:', error);
+    res.status(500).json({ message: 'Error updating driver photo.', error });
+  }
+});
 
 
 
 
 
 
+
+
+
+// Assume this is a part of your existing API route handler
+app.get('/api/earnings/driver/:driverUid', async (req, res) => {
+  try {
+    // Extract the driverUid from the URL parameter
+    const driverUid = req.params.driverUid.trim();
+    console.log('Received Driver UID from URL:', driverUid);  // Log the driverUid
+
+    // SQL query to fetch earnings based on the driver_uid
+    const sql = 'SELECT * FROM payments WHERE driver_uid = ?';
+    console.log('Executing SQL Query:', sql, 'with value:', driverUid);  // Log the SQL query
+
+    // Execute the query using the provided driverUid
+    const [earnings] = await db.query(sql, [driverUid]);
+
+    // Log the query result to see what is returned
+    console.log('Query Result:', earnings);
+
+    // If no earnings are found, return a 404 error
+    if (earnings.length === 0) {
+      console.log('No earnings found for Driver UID:', driverUid);
+      return res.status(404).json({ error: 'No earnings found' });
+    }
+
+    // Log the earnings found and send them as the response
+    console.log('Found Earnings:', earnings);
+    res.json(earnings);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch earnings' });
+  }
+});
+app.get('/api/reviews/driver/:driverUid', async (req, res) => {
+  try {
+    // Extract the driverUid from the URL parameter
+    const driverUid = req.params.driverUid.trim();
+    console.log('Received Driver UID from URL:', driverUid);  // Log the driverUid
+    const sql = 'SELECT * FROM reviews WHERE driver_uid = ?;';
+    console.log('Executing SQL Query:', sql, 'with value:', driverUid);  // Log the SQL query
+
+    // Execute the query using the provided driverUid
+    const [reviews] = await db.query(sql, [driverUid]);
+    console.log('Query Result:', reviews);
+    if (reviews.length === 0) {
+      console.log('No reviews found for Driver UID:', driverUid);
+      return res.status(404).json({ error: 'No reviews found' });
+    }
+    console.log('Found reviews:', reviews);
+    res.json(reviews);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+app.get('/api/reviews/user/:userId', async (req, res) => {
+  try {
+    // Extract the driverUid from the URL parameter
+    const userId = req.params.userId.trim();
+    console.log('Received User ID from URL:', userId);  // Log the driverUid
+    const sql = 'SELECT * FROM reviews WHERE user_id = ?;';
+    console.log('Executing SQL Query:', sql, 'with value:', userId);  // Log the SQL query
+
+    // Execute the query using the provided driverUid
+    const [reviews] = await db.query(sql, [userId]);
+    console.log('Query Result:', reviews);
+    if (reviews.length === 0) {
+      console.log('No reviews found for User ID:', userId);
+      return res.status(404).json({ error: 'No reviews found' });
+    }
+    console.log('Found reviews:', reviews);
+    res.json(reviews);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch reviews' });
+  }
+});
+app.get('/api/driver_ratings/driver/:driverUid', async (req, res) => {
+  try {
+    const driverUid = req.params.driverUid.trim();
+    console.log('Received Driver UID from URL:', driverUid);  // Log the driverUid
+
+    const sql = `
+      SELECT AVG(driver_rating) AS average_rating
+      FROM driver_ratings
+      WHERE driver_uid = ?;
+    `;
+    console.log('Executing SQL Query:', sql, 'with value:', driverUid);  // Log the SQL query
+
+    const [result] = await db.query(sql, [driverUid]);
+    console.log('Query Result:', result);
+
+    const averageRating = result[0].average_rating;
+    console.log('Average Rating Type:', typeof averageRating);
+    console.log('Average Rating Value:', averageRating);
+
+    if (averageRating === null || isNaN(averageRating)) {
+      console.log('No ratings found or invalid average rating for Driver UID:', driverUid);
+      return res.status(404).json({ error: 'No ratings found for the specified driver.' });
+    }
+
+    const formattedAverageRating = parseFloat(averageRating).toFixed(2);
+    console.log('Calculated Average Rating:', formattedAverageRating);
+
+    res.json({ average_rating: formattedAverageRating });
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch ratings', details: error.message });
+  }
+});
+app.get('/api/user_ratings/user/:userId', async (req, res) => {
+  try {
+    const userId = req.params.userId.trim();
+    console.log('Received user ID from URL:', userId);  // Log the userId
+
+    const sql = `
+      SELECT AVG(user_rating) AS average_rating
+      FROM reviews
+      WHERE user_id = ?;
+    `;
+    console.log('Executing SQL Query:', sql, 'with value:', userId);  // Log the SQL query
+
+    const [result] = await db.query(sql, [userId]);
+    console.log('Query Result:', result);
+
+    const averageRating = result[0].average_rating;
+    console.log('Average Rating Type:', typeof averageRating);
+    console.log('Average Rating Value:', averageRating);
+
+    if (averageRating === null || isNaN(averageRating)) {
+      console.log('No ratings found or invalid average rating for user ID:', userId);
+      return res.status(404).json({ error: 'No ratings found for the specified driver.' });
+    }
+
+    const formattedAverageRating = parseFloat(averageRating).toFixed(2);
+    console.log('Calculated Average Rating:', formattedAverageRating);
+
+    res.json({ average_rating: formattedAverageRating });
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch ratings', details: error.message });
+  }
+});
+
+app.get('/api/rides/user/:userId', async (req, res) => {
+  try {
+    // Extract the userId from the URL parameter
+    const userId = req.params.userId.trim(); // Get the userId from the URL
+    console.log('Received User ID from URL:', userId);  // Log the userId
+
+    // SQL query to fetch rides based on the user_id
+    const sql = 'SELECT * FROM rides WHERE user_id = ?';
+    console.log('Executing SQL Query:', sql, 'with value:', userId);  // Log the SQL query
+
+    // Execute the query using the provided userId
+    const [rides] = await db.query(sql, [userId]);
+
+    // Log the query result to see what is returned
+    console.log('Query Result:', rides);
+
+    // If no rides are found, return a 404 error
+    if (rides.length === 0) {
+      console.log('No rides found for User ID:', userId);
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    // Log the rides found and send them as the response
+    console.log('Found Rides:', rides);
+    res.json(rides);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch ride history' });
+  }
+});
+app.get('/user/profile/:userId', async (req, res) => {
+  const userId = req.params.userId; // Match the parameter name
+  try {
+    const [user] = await db.query('SELECT * FROM users WHERE id = ?', [userId]);
+    if (user.length > 0) {
+      // Modify the user object to include the full photo URL if applicable
+      const userData = user[0];
+      if (userData.image_url) {
+        userData.image_url = `http://localhost:3000/uploads/${userData.image_url}`;
+      }
+      res.status(200).json(userData);
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error('Error fetching user profile:', error);
+    res.status(500).json({ message: 'Error fetching user profile', error });
+  }
+});
 
 
 // Start server
