@@ -4,6 +4,6 @@ import { createRideRequest, getRideRequests } from '../controllers/rideRequestsC
 const rideRequestRouter = express.Router();
 
 rideRequestRouter.post('/', createRideRequest); // Create a ride request
-rideRequestRouter.get('/:userId', getRideRequests); // Get ride requests for a user
+rideRequestRouter.get('/getRide', getRideRequests); // Get ride requests for a user
 
 export default rideRequestRouter;

@@ -1,3 +1,4 @@
+import axios from 'axios';
 import bcrypt from 'bcrypt';
 import bodyParser from 'body-parser';
 import cors from 'cors';
@@ -22,6 +23,7 @@ import paymentsRouter from './src/routes/payments.js';
 import reviewsRouter from './src/routes/reviews.js';
 import rideRequestsRouter from './src/routes/rideRequests.js';
 import ridesRouter from './src/routes/rides.js';
+import updateProfileRouter from './src/routes/updateProfile.js';
 import userRoutes from './src/routes/userRoutes.js';
 import verifyDriverRoutes from './src/routes/verifyDriverRoutes.js';
 // Get __dirname equivalent in ES module
@@ -512,6 +514,36 @@ app.get('/api/rides/user/:userId', async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch ride history' });
   }
 });
+app.get('/api/rides/driver/:driverUid', async (req, res) => {
+  try {
+    // Extract the userId from the URL parameter
+    const driverUid = req.params.driverUid.trim(); // Get the userId from the URL
+    console.log('Received Driver Uid from URL:', driverUid);  // Log the userId
+
+    // SQL query to fetch rides based on the driver_uid
+    const sql = 'SELECT * FROM rides WHERE driver_uid = ?';
+    console.log('Executing SQL Query:', sql, 'with value:', driverUid);  // Log the SQL query
+
+    // Execute the query using the provided userId
+    const [rides] = await db.query(sql, [driverUid]);
+
+    // Log the query result to see what is returned
+    console.log('Query Result:', rides);
+
+    // If no rides are found, return a 404 error
+    if (rides.length === 0) {
+      console.log('No rides found for User ID:', driverUid);
+      return res.status(404).json({ error: 'Ride not found' });
+    }
+
+    // Log the rides found and send them as the response
+    console.log('Found Rides:', rides);
+    res.json(rides);
+  } catch (error) {
+    console.error('Database query failed:', error);
+    res.status(500).json({ error: 'Failed to fetch ride history' });
+  }
+});
 
 
 app.get('/test', async (req, res) => {
@@ -790,6 +822,45 @@ app.get('/user/profile/:userId', async (req, res) => {
     res.status(500).json({ message: 'Error fetching user profile', error });
   }
 });
+app.use('/profile', updateProfileRouter);
+function getBaseUrl() {
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://10.0.2.2:3000';  // Local development
+  } else {
+    return 'http://localhost:3000';  // Production environment
+  }
+}
+
+app.get('/api/users/:user_id', async (req, res) => {
+  const userId = req.params.user_id;
+  try {
+    const user = await UserModel.findById(userId);  // Adjusted for Sequelize/SQL UserModel
+
+    if (user) {
+      // Format image URL if exists
+      if (user.image_url) {
+        user.image_url = `http://localhost:3000/uploads/${user.image_url}`;
+      }
+
+      // Fetch the average rating for the user
+      const ratingResponse = await axios.get(`${getBaseUrl()}/api/user_ratings/user/${userId}`);
+      const averageRating = ratingResponse.data.average_rating;
+
+      res.json({ 
+        first_name: user.first_name, 
+        last_name: user.last_name,
+        image: user.image_url,          
+        average_rating: averageRating  // Include user average rating
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    console.error(error);  // Log the error for debugging
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+});
+
 
 
 // Start server

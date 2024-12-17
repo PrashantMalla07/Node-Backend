@@ -20,13 +20,11 @@ export const createRideRequest = async (req, res) => {
   }
 };
 export const getRideRequests = async (req, res) => {
-  const { userId } = req.params;
-
   try {
-    const [results] = await db.query('SELECT * FROM ride_requests WHERE user_id = ?', [userId]);
+    const [results] = await db.query('SELECT * FROM ride_requests');
 
     if (!results.length) {
-      return res.status(404).json({ message: 'No ride requests found for this user' });
+      return res.status(404).json({ message: 'No ride requests found' });
     }
 
     const parsedResults = results.map(request => ({
@@ -41,3 +39,5 @@ export const getRideRequests = async (req, res) => {
     res.status(500).json({ error: 'Failed to fetch ride requests', details: error.message });
   }
 };
+
+
