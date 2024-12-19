@@ -21,7 +21,7 @@ export const createRideRequest = async (req, res) => {
 };
 export const getRideRequests = async (req, res) => {
   try {
-    const [results] = await db.query('SELECT * FROM ride_requests');
+    const [results] = await db.query('SELECT * FROM ride_requests WHERE status = "pending" ORDER BY request_time DESC');
 
     if (!results.length) {
       return res.status(404).json({ message: 'No ride requests found' });

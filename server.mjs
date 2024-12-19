@@ -159,11 +159,15 @@ app.post('/login', async (req, res) => {
       }
 
       // Generate JWT token with the same secret key used for verification
-      const token = jwt.sign(
-          { id: user.id, email: user.email, isAdmin: user.is_admin === 1 },
-          'your_secret_key',  // Ensure this is the same secret key
-          { expiresIn: '1y' }
-      );
+      const payload = { id: 18, email: 'admin@example.com', isAdmin: true };
+      const token = jwt.sign(payload, 'your_jwt_secret', { expiresIn: '1h' });
+      
+      try {
+          const decoded = jwt.verify(token, 'your_jwt_secret');
+          console.log('Token is valid:', decoded);
+      } catch (err) {
+          console.error('Token verification failed:', err.message);
+      }
 
       res.status(200).json({
           message: 'Login successful',
@@ -453,36 +457,82 @@ app.post('/api/ride-requests/accept/:id', async (req, res) => {
       return res.status(404).send('Ride request not found');
     }
 
-    // Destructure the values from the ride request
     const { user_id, pickup_location, dropoff_location } = rideRequest[0];
 
-    // Check for any undefined values
-    if (user_id === undefined || driverUid === undefined || pickup_location === undefined || dropoff_location === undefined) {
-      console.error('Missing required fields:', { user_id, driverUid, pickup_location, dropoff_location });
-      return res.status(400).send('Missing required fields');
+    // Fetch the driver's location based on their UID
+    const [driver] = await pool.execute(
+      'SELECT latitude, longitude FROM drivers WHERE uid = ?',
+      [driverUid]
+    );
+
+    if (!driver || !driver[0]) {
+      return res.status(404).send('Driver location not found');
     }
 
-    console.log('Inserting into rides:', { user_id, driverUid, pickup_location, dropoff_location });
+    const driverLocation = driver[0];
 
-    // Insert a new ride record into the `rides` table
+    // Insert the ride into the rides table
     const [result] = await pool.execute(
       'INSERT INTO rides (user_id, driver_uid, pickup_location, dropoff_location, status) VALUES (?, ?, ?, ?, ?)',
       [user_id, driverUid, pickup_location, dropoff_location, 'accepted']
     );
 
-    // Update the status of the ride request to 'accepted'
+    // Update the ride request status to 'accepted'
     await pool.execute(
       'UPDATE ride_requests SET status = ? WHERE id = ?',
       ['accepted', rideRequestId]
     );
 
-    console.log('Ride accepted successfully:', result);
-    res.status(200).send('Ride request accepted and ride created successfully');
+    // Respond with ride status and the driver's location
+    res.status(200).json({
+      status: 'accepted',
+      driver_location: driverLocation,  // Return the driver's location (latitude and longitude)
+      pickup_location,
+      dropoff_location,
+    });
   } catch (err) {
     console.error('Error processing ride request:', err.message);
     res.status(500).send('Failed to accept ride request');
   }
 });
+// Function to get driver location by driver UID
+app.get('/api/ride-status/:rideRequestId', async (req, res) => {
+  const rideRequestId = req.params.rideRequestId;
+  try {
+    const [rideRequest] = await pool.execute(
+      'SELECT * FROM ride_requests WHERE id = ?',
+      [rideRequestId]
+    );
+
+    if (rideRequest.length === 0) {
+      return res.status(404).send('Ride request not found');
+    }
+
+    const { status, pickup_location, dropoff_location } = rideRequest[0];
+
+    // Set a constant driver location
+    const driverLocation = {
+      latitude: 28.233524, // Example latitude
+      longitude: 83.989597 // Example longitude
+    };
+
+    res.json({
+      status,
+      driver_location: driverLocation,
+      pickup_location: JSON.parse(pickup_location),
+      dropoff_location: JSON.parse(dropoff_location),
+    });
+  } catch (error) {
+    console.error('Error fetching ride status:', error);
+    res.status(500).send('Internal Server Error');
+  }
+});
+
+
+
+
+
+
 // In your Node.js/Express backend
 app.get('/api/rides/user/:userId', async (req, res) => {
   try {
@@ -568,7 +618,6 @@ app.get('/test', async (req, res) => {
   }
 });
 
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Endpoint to fetch driver profile
 app.get('/driver/profile/:driverUid', async (req, res) => {
@@ -578,9 +627,13 @@ app.get('/driver/profile/:driverUid', async (req, res) => {
     if (driver.length > 0) {
       // Modify the driver object to include the full photo URL
       const driverData = driver[0];
-      driverData.driver_photo = `http://localhost:3000/uploads/${driverData.driver_photo}`;
-      driverData.license_photo = `http://localhost:3000/uploads/${driverData.license_photo}`;
-      driverData.citizenship_photo = `http://localhost:3000/uploads/${driverData.citizenship_photo}`;
+      // Set this dynamically based on your environment
+
+      const baseUrl = process.env.NODE_ENV === 'development' ? 'http://10.0.2.2:3000' : 'http://localhost:3000'; // Replace <YOUR_MACHINE_IP> with your actual IP
+
+      driverData.driver_photo = `${baseUrl}/${driverData.driver_photo}`;
+      driverData.license_photo = `${baseUrl}/${driverData.license_photo}`;
+      driverData.citizenship_photo = `${baseUrl}/${driverData.citizenship_photo}`;
       res.status(200).json(driverData);
     } else {
       res.status(404).json({ message: 'Driver not found' });
@@ -591,6 +644,8 @@ app.get('/driver/profile/:driverUid', async (req, res) => {
   }
 });
 
+
+ 
 app.post('/upload', upload.single('photo'), (req, res) => {
   if (req.file) {
     res.status(200).json({ message: 'Photo uploaded successfully!' });
@@ -709,36 +764,35 @@ app.get('/api/reviews/user/:userId', async (req, res) => {
 app.get('/api/driver_ratings/driver/:driverUid', async (req, res) => {
   try {
     const driverUid = req.params.driverUid.trim();
-    console.log('Received Driver UID from URL:', driverUid);  // Log the driverUid
+    console.log('Received Driver UID from URL:', driverUid); // Log the driverUid
 
     const sql = `
       SELECT AVG(driver_rating) AS average_rating
       FROM driver_ratings
       WHERE driver_uid = ?;
     `;
-    console.log('Executing SQL Query:', sql, 'with value:', driverUid);  // Log the SQL query
+    console.log('Executing SQL Query:', sql, 'with value:', driverUid); // Log the SQL query
 
     const [result] = await db.query(sql, [driverUid]);
     console.log('Query Result:', result);
 
-    const averageRating = result[0].average_rating;
+    // Fetch and process the average rating
+    const averageRating = result[0]?.average_rating ?? 5; // Default to 5 if no ratings
     console.log('Average Rating Type:', typeof averageRating);
     console.log('Average Rating Value:', averageRating);
 
-    if (averageRating === null || isNaN(averageRating)) {
-      console.log('No ratings found or invalid average rating for Driver UID:', driverUid);
-      return res.status(404).json({ error: 'No ratings found for the specified driver.' });
-    }
-
+    // Format the rating to two decimal places
     const formattedAverageRating = parseFloat(averageRating).toFixed(2);
     console.log('Calculated Average Rating:', formattedAverageRating);
 
+    // Send the response
     res.json({ average_rating: formattedAverageRating });
   } catch (error) {
     console.error('Database query failed:', error);
     res.status(500).json({ error: 'Failed to fetch ratings', details: error.message });
   }
 });
+
 app.get('/api/user_ratings/user/:userId', async (req, res) => {
   try {
     const userId = req.params.userId.trim();
@@ -754,15 +808,11 @@ app.get('/api/user_ratings/user/:userId', async (req, res) => {
     const [result] = await db.query(sql, [userId]);
     console.log('Query Result:', result);
 
-    const averageRating = result[0].average_rating;
+    const averageRating = result[0].average_rating?? 5;
     console.log('Average Rating Type:', typeof averageRating);
     console.log('Average Rating Value:', averageRating);
 
-    if (averageRating === null || isNaN(averageRating)) {
-      console.log('No ratings found or invalid average rating for user ID:', userId);
-      return res.status(404).json({ error: 'No ratings found for the specified driver.' });
-    }
-
+  
     const formattedAverageRating = parseFloat(averageRating).toFixed(2);
     console.log('Calculated Average Rating:', formattedAverageRating);
 
@@ -859,6 +909,61 @@ app.get('/api/users/:user_id', async (req, res) => {
     console.error(error);  // Log the error for debugging
     res.status(500).json({ message: 'Server error', error: error.message });
   }
+});
+
+app.get('/rides/:id', (req, res) => {
+  const rideId = req.params.id;
+  const query = 'SELECT * FROM rides WHERE id = ?';
+
+  db.query(query, [rideId], (err, results) => {
+    if (err) {
+      console.error('Error fetching ride:', err);
+      res.status(500).send('Database error');
+      return;
+    }
+
+    if (results.length === 0) {
+      res.status(404).send('Ride not found');
+      return;
+    }
+
+    res.json(results[0]);
+  });
+});
+
+// Update ride status to "started"
+app.post('/rides/:id/start', (req, res) => {
+  const rideId = req.params.id;
+  const query = 'UPDATE rides SET status = ? WHERE id = ?';
+  const params = ['started', rideId];
+
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error('Error updating ride:', err);
+      res.status(500).send('Database error');
+      return;
+    }
+
+    res.json({ message: 'Ride started', affectedRows: results.affectedRows });
+  });
+});
+
+// Update ride status to "completed"
+app.post('/rides/:id/complete', (req, res) => {
+  const rideId = req.params.id;
+  const query =
+    'UPDATE rides SET status = ?, completed_at = NOW() WHERE id = ?';
+  const params = ['completed', rideId];
+
+  db.query(query, params, (err, results) => {
+    if (err) {
+      console.error('Error completing ride:', err);
+      res.status(500).send('Database error');
+      return;
+    }
+
+    res.json({ message: 'Ride completed', affectedRows: results.affectedRows });
+  });
 });
 
 
